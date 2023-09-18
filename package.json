@@ -1,0 +1,32 @@
+{
+  "name": "emailtographapi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "ts-node -r dotenv/config src/main.ts",
+    "send": "ts-node test/smtpMail.ts",
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/identity": "^3.3.0",
+    "@microsoft/microsoft-graph-client": "^3.0.6",
+    "mailparser": "^3.6.5",
+    "smtp-server": "^3.13.0"
+  },
+  "devDependencies": {
+    "@microsoft/microsoft-graph-types": "^2.38.0",
+    "@types/mailparser": "^3.4.0",
+    "@types/node": "^20.6.0",
+    "@types/nodemailer": "^6.4.10",
+    "@types/smtp-server": "^3.5.7",
+    "dotenv": "^16.3.1",
+    "nodemailer": "^6.9.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
