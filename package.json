@@ -1,11 +1,10 @@
 {
-  "name": "emailtographapi",
+  "name": "smtp-to-graph",
   "version": "1.0.0",
   "description": "",
   "main": "dist/main.js",
   "scripts": {
     "dev": "ts-node -r dotenv/config src/main.ts",
-    "send": "ts-node test/smtpMail.ts",
     "build": "tsc",
     "start": "node dist/main.js"
   },
