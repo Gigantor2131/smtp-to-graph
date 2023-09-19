@@ -10,8 +10,3 @@ export function toAddress(address: AddressObject | AddressObject[] | undefined):
 		return address.value.map(a => ({ emailAddress: { address: a.address } }))
 	}
 }
-
-export function envIsValue(value: undefined | null | string) {
-	if (value === undefined || value === null || value === "") { return false }
-	else { return true }
-}
