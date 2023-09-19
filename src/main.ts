@@ -1,10 +1,11 @@
 import { SMTPServer } from 'smtp-server'
 import { Client } from "@microsoft/microsoft-graph-client"
 import { simpleParser as parser } from 'mailparser'
-import type { AddressObject } from 'mailparser'
 import type { Message } from '@microsoft/microsoft-graph-types'
 import { ClientSecretCredential } from '@azure/identity'
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
+
+import { toAddress } from './utils'
 
 // import { readFileSync } from 'fs';
 // import { join } from 'path';
@@ -14,17 +15,18 @@ const MSAL_TENANT_ID = process.env.MSAL_TENANT_ID
 const MSAL_CLIENT_ID = process.env.MSAL_CLIENT_ID
 const MSAL_CLIENT_SECRET = process.env.MSAL_CLIENT_SECRET
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN
+const PORT = Number(process.env.PORT ?? 465)
 
-if (OVERIDE_FROM_ADDRESS == undefined) { console.log('OVERIDE_FROM_ADDRESS is not defined') }
-else { console.log('OVERIDE_FROM_ADDRESS was provided') }
+
+if (OVERIDE_FROM_ADDRESS === undefined || OVERIDE_FROM_ADDRESS === null || OVERIDE_FROM_ADDRESS === "") { console.log('OVERIDE_FROM_ADDRESS is not defined') } else { console.log(`OVERIDE_FROM_ADDRESS: ${OVERIDE_FROM_ADDRESS}`) }
 
 const graphClient = (() => {
-	if (ACCESS_TOKEN == undefined) {
-		console.log('ACCESS_TOKEN is undefined; checking MSAL Values')
+	if (ACCESS_TOKEN === undefined || ACCESS_TOKEN === null || ACCESS_TOKEN === "") {
+		console.log('ACCESS_TOKEN is not defined; using App Registration')
 
-		if (MSAL_TENANT_ID == undefined) { throw new Error('MSAL_TENANT_ID is not defined') } else { console.log('MSAL_TENANT_ID was provided') }
-		if (MSAL_CLIENT_ID == undefined) { throw new Error('MSAL_CLIENT_ID is not defined') } else { console.log('MSAL_CLIENT_ID was provided') }
-		if (MSAL_CLIENT_SECRET == undefined) { throw new Error('MSAL_CLIENT_SECRET is not defined') } else { console.log('MSAL_CLIENT_SECRET was provided') }
+		if (MSAL_TENANT_ID === undefined || MSAL_TENANT_ID === null || MSAL_TENANT_ID === "") { throw new Error('MSAL_TENANT_ID is not defined') } else { console.log(`MSAL_TENANT_ID: $${MSAL_TENANT_ID}`) }
+		if (MSAL_CLIENT_ID === undefined || MSAL_CLIENT_ID === null || MSAL_CLIENT_ID === "") { throw new Error('MSAL_CLIENT_ID is not defined') } else { console.log(`MSAL_CLIENT_ID: ${MSAL_CLIENT_ID}`) }
+		if (MSAL_CLIENT_SECRET === undefined || MSAL_CLIENT_SECRET === null || MSAL_CLIENT_SECRET === "") { throw new Error('MSAL_CLIENT_SECRET is not defined') } else { console.log('MSAL_CLIENT_SECRET: was provided') }
 
 		const credential = new ClientSecretCredential(
 			MSAL_TENANT_ID,
@@ -33,26 +35,16 @@ const graphClient = (() => {
 		)
 		const authProvider = new TokenCredentialAuthenticationProvider(credential, { scopes: ['https://graph.microsoft.com/Mail.Send'] })
 		const client = Client.initWithMiddleware({ authProvider })
-		console.log('graphClient instanciated via App Registration')
+		console.log('graphClient instantiated via App Registration')
 		return client
 	} else {
 		console.log('ACCESS_TOKEN was provided; Scopes not validated')
 		const client = Client.init({ authProvider: (done) => done(null, ACCESS_TOKEN) })
-		console.log('graphClient instanciated via ACCESS_TOKEN')
+		console.log('graphClient instantiated via ACCESS_TOKEN')
 		return client
 	}
 })()
 
-// helper utility
-function toAddress(address: AddressObject | AddressObject[] | undefined): Message['toRecipients'] {
-	if (address == undefined) return []
-	if (Array.isArray(address)) {
-		return address.map(obj => obj.value).flat(1).map(a => ({ emailAddress: { address: a.address } }))
-	}
-	else {
-		return address.value.map(a => ({ emailAddress: { address: a.address } }))
-	}
-}
 
 const smtpServer = new SMTPServer({
 	// secure: true,
@@ -90,7 +82,7 @@ const smtpServer = new SMTPServer({
 	onData(stream, session, callback) {
 		parser(stream)
 			.then(msg => {
-				console.log({
+				console.dir({
 					rawFrom: msg.from?.value[0].address,
 					from: OVERIDE_FROM_ADDRESS || msg.from?.value[0].address,
 					to: msg.to,
@@ -99,7 +91,7 @@ const smtpServer = new SMTPServer({
 					html: String(msg.html),
 					text: msg.text,
 					attachments: msg.attachments.length,
-				})
+				}, { depth: 5 })
 
 				// map from smtp to graph
 				const sendMail: { message: Message, saveToSentItems?: boolean } = {
@@ -140,6 +132,5 @@ const smtpServer = new SMTPServer({
 	}
 })
 
-const port = process.env.PORT ?? 465
-smtpServer.listen(port, () => { console.log(`SMTP Server listening on port ${port}`) })
+smtpServer.listen(PORT, () => { console.log(`SMTP Server listening on port ${PORT}`) })
 smtpServer.on('error', (e) => { console.error(e) })
