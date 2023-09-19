@@ -15,7 +15,7 @@ const MSAL_TENANT_ID = process.env.MSAL_TENANT_ID
 const MSAL_CLIENT_ID = process.env.MSAL_CLIENT_ID
 const MSAL_CLIENT_SECRET = process.env.MSAL_CLIENT_SECRET
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN
-const PORT = Number(process.env.PORT ?? 465)
+const PORT = Number(process.env.PORT ?? 25)
 
 
 if (OVERIDE_FROM_ADDRESS === undefined || OVERIDE_FROM_ADDRESS === null || OVERIDE_FROM_ADDRESS === "") { console.log('OVERIDE_FROM_ADDRESS is not defined') } else { console.log(`OVERIDE_FROM_ADDRESS: ${OVERIDE_FROM_ADDRESS}`) }
