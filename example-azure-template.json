@@ -1,0 +1,126 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"name": {
+			"type": "String",
+			"defaultValue": "smtp-to-graph"
+		},
+		"ip": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"image": {
+			"type": "String",
+			"defaultValue": "gigantor2131/smtp-to-graph:latest"
+		},
+		"vnet_name": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"vnet_subnet_name": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"OVERIDE_FROM_ADDRESS": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"PORT": {
+			"type": "int",
+			"defaultValue": 25
+		},
+		"ACCESS_TOKEN": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"MSAL_TENANT_ID": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"MSAL_CLIENT_ID": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"MSAL_CLIENT_SECRET": {
+			"type": "String",
+			"defaultValue": ""
+		}
+	},
+	"variables": {},
+	"resources": [
+		{
+			"type": "Microsoft.ContainerInstance/containerGroups",
+			"apiVersion": "2023-05-01",
+			"name": "[parameters('name')]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"sku": "Standard",
+				"containers": [
+					{
+						"name": "[parameters('name')]",
+						"properties": {
+							"image": "[parameters('image')]",
+							"ports": [
+								{
+									"protocol": "TCP",
+									"port": "[parameters('PORT')]"
+								}
+							],
+							"environmentVariables": [
+								{
+									"name": "PORT",
+									"value": "[parameters('PORT')]"
+								},
+								{
+									"name": "OVERIDE_FROM_ADDRESS",
+									"secureValue": "[parameters('OVERIDE_FROM_ADDRESS')]"
+								},
+								{
+									"name": "ACCESS_TOKEN",
+									"secureValue": "[parameters('ACCESS_TOKEN')]"
+								},
+								{
+									"name": "MSAL_TENANT_ID",
+									"value": "[parameters('MSAL_TENANT_ID')]"
+								},
+								{
+									"name": "MSAL_CLIENT_ID",
+									"value": "[parameters('MSAL_CLIENT_ID')]"
+								},
+								{
+									"name": "MSAL_CLIENT_SECRET",
+									"secureValue": "[parameters('MSAL_CLIENT_SECRET')]"
+								}
+							],
+							"resources": {
+								"requests": {
+									"memoryInGB": 1,
+									"cpu": 1
+								}
+							}
+						}
+					}
+				],
+				"initContainers": [],
+				"restartPolicy": "Never",
+				"osType": "Linux",
+				"ipAddress": {
+					"type": "Private",
+					"ip": "[parameters('ip')]",
+					"ports": [
+						{
+							"protocol": "TCP",
+							"port": "[parameters('PORT')]"
+						}
+					]
+				},
+				"subnetIds": [
+					{
+						"id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('vnet_subnet_name'))]"
+					}
+				]
+			}
+		}
+	]
+}
