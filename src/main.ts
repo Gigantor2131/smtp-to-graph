@@ -10,14 +10,17 @@ import { toAddress } from './utils'
 // import { readFileSync } from 'fs';
 // import { join } from 'path';
 
-const OVERIDE_FROM_ADDRESS = process.env.OVERIDE_FROM_ADDRESS //use in the event the credential only has permission to send as 1 user
+
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN
+
 const MSAL_SEND_FROM = process.env.MSAL_SEND_FROM //used to tell the application what mailbox to use when using MSAL Authentication
 const MSAL_TENANT_ID = process.env.MSAL_TENANT_ID
 const MSAL_CLIENT_ID = process.env.MSAL_CLIENT_ID
 const MSAL_CLIENT_SECRET = process.env.MSAL_CLIENT_SECRET
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN
-const DEBUG = process.env.DEBUG?.toUpperCase() === 'TRUE'
+
 const PORT = Number(process.env.PORT ?? 25)
+const OVERIDE_FROM_ADDRESS = process.env.OVERIDE_FROM_ADDRESS //use in the event the credential only has permission to send as 1 user
+const DEBUG = process.env.DEBUG?.toUpperCase() === 'TRUE'
 
 main()
 async function main() {

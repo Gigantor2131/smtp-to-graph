@@ -22,15 +22,11 @@
 			"type": "String",
 			"defaultValue": ""
 		},
-		"OVERIDE_FROM_ADDRESS": {
+		"ACCESS_TOKEN": {
 			"type": "String",
 			"defaultValue": ""
 		},
-		"PORT": {
-			"type": "int",
-			"defaultValue": 25
-		},
-		"ACCESS_TOKEN": {
+		"MSAL_SEND_FROM": {
 			"type": "String",
 			"defaultValue": ""
 		},
@@ -43,6 +39,18 @@
 			"defaultValue": ""
 		},
 		"MSAL_CLIENT_SECRET": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"PORT": {
+			"type": "int",
+			"defaultValue": 25
+		},
+		"OVERIDE_FROM_ADDRESS": {
+			"type": "String",
+			"defaultValue": ""
+		},
+		"DEBUG": {
 			"type": "String",
 			"defaultValue": ""
 		}
@@ -69,16 +77,12 @@
 							],
 							"environmentVariables": [
 								{
-									"name": "PORT",
-									"value": "[parameters('PORT')]"
-								},
-								{
-									"name": "OVERIDE_FROM_ADDRESS",
-									"secureValue": "[parameters('OVERIDE_FROM_ADDRESS')]"
-								},
-								{
 									"name": "ACCESS_TOKEN",
 									"secureValue": "[parameters('ACCESS_TOKEN')]"
+								},
+								{
+									"name": "MSAL_SEND_FROM",
+									"value": "[parameters('MSAL_SEND_FROM')]"
 								},
 								{
 									"name": "MSAL_TENANT_ID",
@@ -91,6 +95,18 @@
 								{
 									"name": "MSAL_CLIENT_SECRET",
 									"secureValue": "[parameters('MSAL_CLIENT_SECRET')]"
+								},
+								{
+									"name": "PORT",
+									"value": "[parameters('PORT')]"
+								},
+								{
+									"name": "OVERIDE_FROM_ADDRESS",
+									"secureValue": "[parameters('OVERIDE_FROM_ADDRESS')]"
+								},
+								{
+									"name": "DEBUG",
+									"secureValue": "[parameters('DEBUG')]"
 								}
 							],
 							"resources": {
