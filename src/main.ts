@@ -1,11 +1,11 @@
 import { SMTPServer } from 'smtp-server'
 import { Client } from '@microsoft/microsoft-graph-client'
-import { simpleParser as parser } from 'mailparser'
+import { simpleParser } from 'mailparser'
 import type { Message } from '@microsoft/microsoft-graph-types'
 import { ClientSecretCredential } from '@azure/identity'
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials';
 
-import { toAddress } from './utils'
+import { toAddress, mapAddressesToGraph } from './utils'
 
 // import { readFileSync } from 'fs';
 // import { join } from 'path';
@@ -88,27 +88,39 @@ async function main() {
 		// 		callback(new Error('Invalid From'))
 		// 	}
 		// },
-
 		onData(stream, session, callback) {
-			parser(stream)
+			if (DEBUG) { stream.pipe(process.stdout) }
+			simpleParser(stream)
 				.then(msg => {
 					//log inbound message information
+					const to = toAddress(msg.to)
+					const cc = toAddress(msg.cc)
+					const bcc = msg.bcc !== undefined
+						? toAddress(msg.bcc)
+						: session.envelope.rcptTo.map(a => a.address).filter(a => !to.includes(a) && !cc.includes(a))
 					if (DEBUG) {
 						console.dir({
+							remoteAddress: session.remoteAddress,
 							rawFrom: msg.from?.value[0].address,
-							from: OVERIDE_FROM_ADDRESS || msg.from?.value[0].address,
-							to: msg.to,
+							to,
+							cc,
+							bcc,
 							subject: msg.subject,
-							isHtml: msg.html === false,
-							html: String(msg.html),
-							text: msg.text,
+							isHtml: msg.html !== false,
 							attachments: msg.attachments.length,
+
+							from: OVERIDE_FROM_ADDRESS || msg.from?.value[0].address,
+							session,
+							msg
 						}, { depth: 5 })
 					}
 					else {
 						console.dir({
+							remoteAddress: session.remoteAddress,
 							rawFrom: msg.from?.value[0].address,
-							to: toAddress(msg.to),
+							to,
+							cc,
+							bcc,
 							subject: msg.subject,
 							isHtml: msg.html !== false,
 							attachments: msg.attachments.length,
@@ -128,9 +140,9 @@ async function main() {
 								contentType: msg.html === false ? 'text' : 'html',
 								content: msg.html === false ? msg.text : msg.html
 							},
-							toRecipients: toAddress(msg.to),
-							ccRecipients: toAddress(msg.cc),
-							bccRecipients: toAddress(msg.bcc),
+							toRecipients: mapAddressesToGraph(to),
+							ccRecipients: mapAddressesToGraph(cc),
+							bccRecipients: mapAddressesToGraph(bcc),
 							attachments: msg.attachments.map(att => ({
 								'@odata.type': '#microsoft.graph.fileAttachment',
 								name: att.filename,
@@ -140,7 +152,7 @@ async function main() {
 						},
 						saveToSentItems: true,
 					}
-
+					if (DEBUG) { console.dir(sendMail, { depth: 5 }) }
 					// send to graph
 					graphClient.api(`/users/${sendFrom}/sendMail`).post(sendMail)
 						.then(() => {
