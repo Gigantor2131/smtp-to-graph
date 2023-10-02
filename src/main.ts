@@ -63,7 +63,7 @@ async function main() {
 	console.log(`sending from mailbox: ${sendFrom}`)
 
 	const smtpServer = new SMTPServer({
-		disabledCommands: ['STARTTLS'],//disable authentication
+		disabledCommands: ['STARTTLS', 'AUTH'],//disable tls & authentication
 		authOptional: true,//disable authentication
 		socketTimeout: SOCKET_TIMEOUT,//allow maximum time for graph api to accept messages; useful for bulk messages
 		logger: DEBUG,
