@@ -14,6 +14,7 @@
   "dependencies": {
     "@azure/identity": "^3.3.0",
     "@microsoft/microsoft-graph-client": "^3.0.6",
+    "async-mutex": "^0.4.0",
     "mailparser": "^3.6.5",
     "smtp-server": "^3.13.0"
   },

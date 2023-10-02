@@ -4,14 +4,12 @@ import { simpleParser } from 'mailparser'
 import type { Message } from '@microsoft/microsoft-graph-types'
 import { ClientSecretCredential } from '@azure/identity'
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials';
+import { Semaphore, withTimeout } from 'async-mutex'
 
 import { toAddress, mapAddressesToGraph } from './utils'
 
-// import { readFileSync } from 'fs';
-// import { join } from 'path';
 
-
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN//set to DO_NOT_SEND to simulate sending an API request without actually doing so; subject allows control of the simulated delay
 
 const MSAL_SEND_FROM = process.env.MSAL_SEND_FROM //used to tell the application what mailbox to use when using MSAL Authentication
 const MSAL_TENANT_ID = process.env.MSAL_TENANT_ID
@@ -20,7 +18,11 @@ const MSAL_CLIENT_SECRET = process.env.MSAL_CLIENT_SECRET
 
 const PORT = Number(process.env.PORT ?? 25)
 const OVERRIDE_FROM_ADDRESS = process.env.OVERRIDE_FROM_ADDRESS //use in the event the credential only has permission to send as 1 user
+const _socketTimeoutInt = parseInt(process.env.SOCKET_TIMEOUT ?? '120000')
+const SOCKET_TIMEOUT = isNaN(_socketTimeoutInt) === false ? _socketTimeoutInt : 120000
 const DEBUG = process.env.DEBUG?.toUpperCase() === 'TRUE'
+
+const graphSendMailSemaphore = withTimeout(new Semaphore(4), SOCKET_TIMEOUT)
 
 main()
 async function main() {
@@ -61,43 +63,18 @@ async function main() {
 	console.log(`sending from mailbox: ${sendFrom}`)
 
 	const smtpServer = new SMTPServer({
-		// secure: true,
-		// key: readFileSync(join(__dirname, '../certs/smtp_key.pem')),
-		// cert: readFileSync(join(__dirname, '../certs/smtp.crt')),
-		// ca: [readFileSync(join(__dirname, '../certs/ca.crt'))],
-		// authMethods: ['PLAIN', 'LOGIN'],
-
 		disabledCommands: ['STARTTLS'],//disable authentication
-		authOptional: true,
-
+		authOptional: true,//disable authentication
+		socketTimeout: SOCKET_TIMEOUT,//allow maximum time for graph api to accept messages; useful for bulk messages
 		logger: DEBUG,
-		// onConnect // useful for session.remoteAddress whitelisting; IP firewall handled by host/iaas
-		// onAuth(auth, session, callback) {
-		// 	if (auth.method === 'LOGIN' || auth.method === 'PLAIN') {
-		// 		if (auth.username === 'username' && auth.password === 'password') {
-		// 			callback(null, { user: 'username' })
-		// 		}
-		// 		else {
-		// 			callback(new Error('Invalid username or password'))
-		// 		}
-		// 	} else {
-		// 		callback(new Error('Invalid auth method'))
-		// 	}
-		// },
-		// onMailFrom(address, session, callback) {
-		// 	if (address.address === 'email@email.com') {
-		// 		callback(null)
-		// 	}
-		// 	else {
-		// 		callback(new Error('Invalid From'))
-		// 	}
-		// },
+
 		async onData(stream, session, callback) {
 			if (DEBUG) { stream.pipe(process.stdout) }
 			const startMS = Date.now()
 			try {
 				const msg = await simpleParser(stream)
-				//log inbound message information
+
+				//extract bcc from envelope
 				const to = toAddress(msg.to)
 				const cc = toAddress(msg.cc)
 				const bcc = msg.bcc !== undefined
@@ -129,55 +106,25 @@ async function main() {
 					},
 					saveToSentItems: true,
 				}
-				// if (DEBUG) { console.dir(sendMail, { depth: 5 }) }
 
 				// send to graph
-				if (graphClient === null) {
-					const num = parseInt(msg?.subject ?? '5000')
-					const timeoutMS = !isNaN(num) ? num : 5000
-					await new Promise<void>((res) => {
-						console.log(`${session.id}\twaiting for: ${timeoutMS}`)
-						setTimeout(() => { res(); }, timeoutMS)
-					})
-				} else {
-					graphClient.api(`/users/${sendFrom}/sendMail`).post(sendMail)
-						.then(() => { console.log({ id: session.id, sendTimeMS: Date.now() - startMS }) })
-						.catch((e) => {
-							// if (e instanceof GraphError && e.statusCode === 429) {
-							// 	e.statusCode
-							// }
-							console.error({ id: session.id, errorTimeMS: Date.now() - startMS })
-							//TODO implement winston //LOG FULL MESSAGE FOR REPLAY & SEND ALERT
-							console.dir(e, { depth: 10 })
-							console.dir(sendMail, { depth: 10 })
+				try {
+					await graphSendMailSemaphore
+						.runExclusive(async () => {
+							if (graphClient === null) {
+								const num = parseInt(msg?.subject ?? '5000')
+								const timeoutMS = isNaN(num) === false ? num : 5000
+								console.log(`${session.id} is waiting for: ${timeoutMS}`)
+								await new Promise<void>((res) => { setTimeout(() => { res(); }, timeoutMS) })
+							} else {
+								graphClient.api(`/users/${sendFrom}/sendMail`).post(sendMail)
+							}
 						})
-				}
-				const timeMS = Date.now() - startMS
 
-				//log
-				if (DEBUG) {
-					console.dir({
-						id: session.id,
-						timeMS,
-						remoteAddress: session.remoteAddress,
-						rawFrom: msg.from?.value[0].address,
-						to,
-						cc,
-						bcc,
-						subject: msg.subject,
-						isHtml: msg.html !== false,
-						attachments: msg.attachments.length,
-
-						from: OVERRIDE_FROM_ADDRESS || msg.from?.value[0].address,
-						session,
-						msg
-					}, { depth: 5 })
-				}
-				else {
-					console.log(
-						JSON.stringify({
+					//log sendMail results
+					if (DEBUG) {
+						console.dir({
 							id: session.id,
-							timeMS,
 							remoteAddress: session.remoteAddress,
 							rawFrom: msg.from?.value[0].address,
 							to,
@@ -186,16 +133,41 @@ async function main() {
 							subject: msg.subject,
 							isHtml: msg.html !== false,
 							attachments: msg.attachments.length,
-						})
-					)
+
+							from: OVERRIDE_FROM_ADDRESS || msg.from?.value[0].address,
+							session,
+							msg
+						}, { depth: 5 })
+					}
+					else {
+						console.log(
+							JSON.stringify({
+								id: session.id,
+								remoteAddress: session.remoteAddress,
+								rawFrom: msg.from?.value[0].address,
+								to,
+								cc,
+								bcc,
+								subject: msg.subject,
+								isHtml: msg.html !== false,
+								attachments: msg.attachments.length,
+							})
+						)
+					}
+					callback()
+				} catch (error) {
+					//TODO log full message to disk for future replay & send alert
+					console.error(error, { id: session.id, sendMail: JSON.stringify(sendMail) })
+					if (error instanceof Error) { callback(error) }
+					else { callback(new Error(`${error}`)) }
 				}
-				callback()
 			} catch (error) {
-				const timeMS = Date.now() - startMS
-				console.info({ id: session.id, timeMS })
 				console.error(error)
 				if (error instanceof Error) { callback(error) }
-				else { callback(new Error(`error did not implement Error: ${error}`)) }
+				else { callback(new Error(`${error}`)) }
+			}
+			finally {
+				console.log({ id: session.id, sendTimeMS: Date.now() - startMS })
 			}
 		}
 	})

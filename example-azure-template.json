@@ -50,6 +50,10 @@
 			"type": "String",
 			"defaultValue": ""
 		},
+		"SOCKET_TIMEOUT": {
+			"type": "int",
+			"defaultValue": "120000"
+		},
 		"DEBUG": {
 			"type": "String",
 			"defaultValue": ""
@@ -102,11 +106,15 @@
 								},
 								{
 									"name": "OVERRIDE_FROM_ADDRESS",
-									"secureValue": "[parameters('OVERRIDE_FROM_ADDRESS')]"
+									"value": "[parameters('OVERRIDE_FROM_ADDRESS')]"
+								},
+								{
+									"name": "SOCKET_TIMEOUT",
+									"value": "[parameters('SOCKET_TIMEOUT')]"
 								},
 								{
 									"name": "DEBUG",
-									"secureValue": "[parameters('DEBUG')]"
+									"value": "[parameters('DEBUG')]"
 								}
 							],
 							"resources": {
@@ -119,7 +127,7 @@
 					}
 				],
 				"initContainers": [],
-				"restartPolicy": "Never",
+				"restartPolicy": "Always",
 				"osType": "Linux",
 				"ipAddress": {
 					"type": "Private",
