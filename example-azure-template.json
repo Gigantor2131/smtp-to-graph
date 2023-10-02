@@ -52,7 +52,7 @@
 		},
 		"SOCKET_TIMEOUT": {
 			"type": "int",
-			"defaultValue": 120000
+			"defaultValue": 90000
 		},
 		"DEBUG": {
 			"type": "String",
