@@ -19,14 +19,18 @@ const MSAL_CLIENT_ID = process.env.MSAL_CLIENT_ID
 const MSAL_CLIENT_SECRET = process.env.MSAL_CLIENT_SECRET
 
 const PORT = Number(process.env.PORT ?? 25)
-const OVERIDE_FROM_ADDRESS = process.env.OVERIDE_FROM_ADDRESS //use in the event the credential only has permission to send as 1 user
+const OVERRIDE_FROM_ADDRESS = process.env.OVERRIDE_FROM_ADDRESS //use in the event the credential only has permission to send as 1 user
 const DEBUG = process.env.DEBUG?.toUpperCase() === 'TRUE'
 
 main()
 async function main() {
-	if (OVERIDE_FROM_ADDRESS === undefined || OVERIDE_FROM_ADDRESS === null || OVERIDE_FROM_ADDRESS === '') { console.log('OVERIDE_FROM_ADDRESS is not defined') } else { console.log(`OVERIDE_FROM_ADDRESS: ${OVERIDE_FROM_ADDRESS}`) }
+	if (OVERRIDE_FROM_ADDRESS === undefined || OVERRIDE_FROM_ADDRESS === null || OVERRIDE_FROM_ADDRESS === '') { console.log('OVERRIDE_FROM_ADDRESS is not defined') } else { console.log(`OVERRIDE_FROM_ADDRESS: ${OVERRIDE_FROM_ADDRESS}`) }
 
 	const { graphClient, sendFrom } = await (async () => {
+		if (ACCESS_TOKEN === 'DO_NOT_SEND') {
+			console.log(`ACCESS_TOKEN is set to flag 'DO_NOT_SEND'`)
+			return { graphClient: null, sendFrom: null }
+		}
 		if (ACCESS_TOKEN === undefined || ACCESS_TOKEN === null || ACCESS_TOKEN === '') {
 			console.log('ACCESS_TOKEN is not defined; using App Registration')
 
@@ -66,7 +70,7 @@ async function main() {
 		disabledCommands: ['STARTTLS'],//disable authentication
 		authOptional: true,
 
-		logger: true,
+		logger: DEBUG,
 		// onConnect // useful for session.remoteAddress whitelisting; IP firewall handled by host/iaas
 		// onAuth(auth, session, callback) {
 		// 	if (auth.method === 'LOGIN' || auth.method === 'PLAIN') {
@@ -88,85 +92,111 @@ async function main() {
 		// 		callback(new Error('Invalid From'))
 		// 	}
 		// },
-		onData(stream, session, callback) {
+		async onData(stream, session, callback) {
 			if (DEBUG) { stream.pipe(process.stdout) }
-			simpleParser(stream)
-				.then(msg => {
-					//log inbound message information
-					const to = toAddress(msg.to)
-					const cc = toAddress(msg.cc)
-					const bcc = msg.bcc !== undefined
-						? toAddress(msg.bcc)
-						: session.envelope.rcptTo.map(a => a.address).filter(a => !to.includes(a) && !cc.includes(a))
-					if (DEBUG) {
-						console.dir({
-							remoteAddress: session.remoteAddress,
-							rawFrom: msg.from?.value[0].address,
-							to,
-							cc,
-							bcc,
-							subject: msg.subject,
-							isHtml: msg.html !== false,
-							attachments: msg.attachments.length,
+			const startMS = Date.now()
+			try {
+				const msg = await simpleParser(stream)
+				//log inbound message information
+				const to = toAddress(msg.to)
+				const cc = toAddress(msg.cc)
+				const bcc = msg.bcc !== undefined
+					? toAddress(msg.bcc)
+					: session.envelope.rcptTo.map(a => a.address).filter(a => !to.includes(a) && !cc.includes(a))
 
-							from: OVERIDE_FROM_ADDRESS || msg.from?.value[0].address,
-							session,
-							msg
-						}, { depth: 5 })
-					}
-					else {
-						console.dir({
-							remoteAddress: session.remoteAddress,
-							rawFrom: msg.from?.value[0].address,
-							to,
-							cc,
-							bcc,
-							subject: msg.subject,
-							isHtml: msg.html !== false,
-							attachments: msg.attachments.length,
-						}, { depth: 5 })
-					}
-
-					// map from smtp to graph
-					const sendMail: { message: Message, saveToSentItems?: boolean } = {
-						message: {
-							from: {
-								emailAddress: {
-									address: OVERIDE_FROM_ADDRESS || msg.from?.value[0].address
-								}
-							},
-							subject: msg.subject,
-							body: {
-								contentType: msg.html === false ? 'text' : 'html',
-								content: msg.html === false ? msg.text : msg.html
-							},
-							toRecipients: mapAddressesToGraph(to),
-							ccRecipients: mapAddressesToGraph(cc),
-							bccRecipients: mapAddressesToGraph(bcc),
-							attachments: msg.attachments.map(att => ({
-								'@odata.type': '#microsoft.graph.fileAttachment',
-								name: att.filename,
-								contentType: att.contentType,
-								contentBytes: att.content.toString('base64'),
-							})),
+				// map from smtp to graph
+				const sendMail: { message: Message, saveToSentItems?: boolean } = {
+					message: {
+						from: {
+							emailAddress: {
+								address: OVERRIDE_FROM_ADDRESS || msg.from?.value[0].address
+							}
 						},
-						saveToSentItems: true,
-					}
-					if (DEBUG) { console.dir(sendMail, { depth: 5 }) }
-					// send to graph
+						subject: msg.subject,
+						body: {
+							contentType: msg.html === false ? 'text' : 'html',
+							content: msg.html === false ? msg.text : msg.html
+						},
+						toRecipients: mapAddressesToGraph(to),
+						ccRecipients: mapAddressesToGraph(cc),
+						bccRecipients: mapAddressesToGraph(bcc),
+						attachments: msg.attachments.map(att => ({
+							'@odata.type': '#microsoft.graph.fileAttachment',
+							name: att.filename,
+							contentType: att.contentType,
+							contentBytes: att.content.toString('base64'),
+						})),
+					},
+					saveToSentItems: true,
+				}
+				// if (DEBUG) { console.dir(sendMail, { depth: 5 }) }
+
+				// send to graph
+				if (graphClient === null) {
+					const num = parseInt(msg?.subject ?? '5000')
+					const timeoutMS = !isNaN(num) ? num : 5000
+					await new Promise<void>((res) => {
+						console.log(`${session.id}\twaiting for: ${timeoutMS}`)
+						setTimeout(() => { res(); }, timeoutMS)
+					})
+				} else {
 					graphClient.api(`/users/${sendFrom}/sendMail`).post(sendMail)
-						.then(() => {
-							callback()
-						})
+						.then(() => { console.log({ id: session.id, sendTimeMS: Date.now() - startMS }) })
 						.catch((e) => {
-							console.error(e)
-							callback(e)
+							// if (e instanceof GraphError && e.statusCode === 429) {
+							// 	e.statusCode
+							// }
+							console.error({ id: session.id, errorTimeMS: Date.now() - startMS })
+							//TODO implement winston //LOG FULL MESSAGE FOR REPLAY & SEND ALERT
+							console.dir(e, { depth: 10 })
+							console.dir(sendMail, { depth: 10 })
 						})
-				})
-				.catch(e => {
-					console.error(e)
-					callback(e)
-				})
+				}
+				const timeMS = Date.now() - startMS
+
+				//log
+				if (DEBUG) {
+					console.dir({
+						id: session.id,
+						timeMS,
+						remoteAddress: session.remoteAddress,
+						rawFrom: msg.from?.value[0].address,
+						to,
+						cc,
+						bcc,
+						subject: msg.subject,
+						isHtml: msg.html !== false,
+						attachments: msg.attachments.length,
+
+						from: OVERRIDE_FROM_ADDRESS || msg.from?.value[0].address,
+						session,
+						msg
+					}, { depth: 5 })
+				}
+				else {
+					console.log(
+						JSON.stringify({
+							id: session.id,
+							timeMS,
+							remoteAddress: session.remoteAddress,
+							rawFrom: msg.from?.value[0].address,
+							to,
+							cc,
+							bcc,
+							subject: msg.subject,
+							isHtml: msg.html !== false,
+							attachments: msg.attachments.length,
+						})
+					)
+				}
+				callback()
+			} catch (error) {
+				const timeMS = Date.now() - startMS
+				console.info({ id: session.id, timeMS })
+				console.error(error)
+				if (error instanceof Error) { callback(error) }
+				else { callback(new Error(`error did not implement Error: ${error}`)) }
+			}
 		}
 	})
 

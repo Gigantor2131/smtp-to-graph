@@ -46,7 +46,7 @@
 			"type": "int",
 			"defaultValue": 25
 		},
-		"OVERIDE_FROM_ADDRESS": {
+		"OVERRIDE_FROM_ADDRESS": {
 			"type": "String",
 			"defaultValue": ""
 		},
@@ -101,8 +101,8 @@
 									"value": "[parameters('PORT')]"
 								},
 								{
-									"name": "OVERIDE_FROM_ADDRESS",
-									"secureValue": "[parameters('OVERIDE_FROM_ADDRESS')]"
+									"name": "OVERRIDE_FROM_ADDRESS",
+									"secureValue": "[parameters('OVERRIDE_FROM_ADDRESS')]"
 								},
 								{
 									"name": "DEBUG",
