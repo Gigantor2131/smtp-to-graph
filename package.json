@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/main.js",
+  "packageManager": "pnpm@9.10.0",
   "scripts": {
     "dev": "ts-node -r dotenv/config src/main.ts",
     "build": "tsc",
@@ -12,21 +13,21 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@azure/identity": "^3.3.0",
-    "@microsoft/microsoft-graph-client": "^3.0.6",
-    "async-mutex": "^0.4.0",
-    "mailparser": "^3.6.5",
-    "smtp-server": "^3.13.0"
+    "@azure/identity": "^3.4.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "async-mutex": "^0.4.1",
+    "mailparser": "^3.7.1",
+    "smtp-server": "^3.13.5"
   },
   "devDependencies": {
-    "@microsoft/microsoft-graph-types": "^2.38.0",
-    "@types/mailparser": "^3.4.0",
-    "@types/node": "^20.6.0",
-    "@types/nodemailer": "^6.4.10",
-    "@types/smtp-server": "^3.5.7",
-    "dotenv": "^16.3.1",
-    "nodemailer": "^6.9.5",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.2.2"
+    "@microsoft/microsoft-graph-types": "^2.40.0",
+    "@types/mailparser": "^3.4.4",
+    "@types/node": "^20.16.5",
+    "@types/nodemailer": "^6.4.15",
+    "@types/smtp-server": "^3.5.10",
+    "dotenv": "^16.4.5",
+    "nodemailer": "^6.9.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
   }
 }
